@@ -3,7 +3,7 @@
 ## About
 MATLAB script for Generalized Gaussian  Distribution (GGD) independent low-rank matrix analysis (ILRMA) and its application to blind audio source separation.
 These scripts are minor changes from D.kitamura's implementation of ILRMA (https://github.com/d-kitamura/ILRMA).
-!!Caution!! now developping
+!!Caution!! now debagging
 
 ## Contents
 - input [dir]:		        includes test audio signals (reverberation time is around 300 ms)
