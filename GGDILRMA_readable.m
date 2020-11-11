@@ -12,11 +12,11 @@ function [S, cost, W] = GGDILRMA_readable(X, type, It, nb, drawConv)
 % When you use or modify these programs and write research articles,
 % cite the following references:
 %
-% # Original paper (The algorithm was called "Rank-1 MNMF" in this paper)
-% D. Kitamura, N. Ono, H. Sawada, H. Kameoka, H. Saruwatari, "Determined
-% blind source separation unifying independent vector analysis and
-% nonnegative matrix factorization," IEEE/ACM Trans. ASLP, vol. 24,
-% no. 9, pp. 1626-1641, September 2016.
+% # Original paper
+% S. Mogami, N. Takamune, D. Kitamura, N. Ono, H. Saruwatari, et al.
+% Independent Low-Rank Matrix Analysis Based on Time-Variant Sub-Gaussian
+% Source Model for Determined Blined Source Separation
+% IEE/ACM Trans. on audio, speech and language processing vol.28 2020
 %
 % # Book chapter (The algorithm was renamed as "ILRMA")
 % D. Kitamura, N. Ono, H. Sawada, H. Kameoka, H. Saruwatari, "Determined
