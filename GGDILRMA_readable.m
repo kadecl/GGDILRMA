@@ -1,4 +1,4 @@
-function [S, cost, W] = GGDILRMA_readable(X, type, It, nb, drawConv, normalize, W, T, V, Z)
+function [S, cost, W] = GGDILRMA_readable(X, type, It, nb, drawConv)
 % Independent low-rank matrix analysis (ILRMA)
 %
 % Coded by D. Kitamura (d-kitamura@ieee.org)
@@ -35,10 +35,6 @@ function [S, cost, W] = GGDILRMA_readable(X, type, It, nb, drawConv, normalize, 
 %   [Y, cost, W] = ILRMA(X, type, It, nb)
 %   [Y, cost, W] = ILRMA(X, type, It, nb, drawConv)
 %   [Y, cost, W] = ILRMA(X, type, It, nb, drawConv, normalize)
-%   [Y, cost, W] = ILRMA(X, type, It, nb, drawConv, normalize, W)
-%   [Y, cost, W] = ILRMA(X, type, It, nb, drawConv, normalize, W, T)
-%   [Y, cost, W] = ILRMA(X, type, It, nb, drawConv, normalize, W, T, V)
-%   [Y, cost, W] = ILRMA(X, type, It, nb, drawConv, normalize, W, T, V, Z)
 %
 % [inputs]
 %          X: input multichannel signals in time-frequency domain (frequency bin x time frame x channel)
@@ -47,10 +43,6 @@ function [S, cost, W] = GGDILRMA_readable(X, type, It, nb, drawConv, normalize, 
 %         nb: number of bases for each source in ILRMA1, or number of bases for all the sources in ILRMA2 (default: time frames/10)
 %   drawConv: calculate values of cost function in each iteration for drawing convergence curve or not (true or false, default: false)
 %  normalize: normalize variables in each iteration to avoid numerical divergence or not (true or false, default: true, normalization may collapse monotonic decrease of the cost function)
-%          W: initial demixing matrix (source x channel x frequency bin, default: identity matrices)
-%          T: initial basis matrix (frequency bin x basis x source in ILRMA1, frequency bin x basis for ILRMA2, default: uniform random matrices)
-%          V: initial activation matrix (basis x time frame x source in ILRMA1, basis x time frame for ILRMA2, default: uniform random matrices)
-%          Z: initial partitioning function (source x basis for ILRMA2, default: uniform random matrices in the range [0,1])
 %
 % [outputs]
 %          Y: estimated multisource signals in time-frequency domain (frequency bin x time frame x source)
@@ -59,6 +51,8 @@ function [S, cost, W] = GGDILRMA_readable(X, type, It, nb, drawConv, normalize, 
 %
 
 % Check errors and set default values
+narginchk(1,5)
+
 [I,J,M] = size(X);
 N = M;
 if (N > I)
@@ -83,39 +77,24 @@ end
 if (nargin < 5)
     drawConv = false;
 end
-if (nargin < 6)
-    normalize = true;
-end
-if (nargin < 7)
+
     W = zeros(N,M,I);
     for i=1:I
         W(:,:,i) = eye(N); % initial demixing matrices (identity matrices)
     end
-end
-if (nargin < 8)
+
     if (type == 1)
         T = max( rand( I, L, N ), eps ); % initial basis matrix in ILRMA1
     elseif (type == 2)
         T = max( rand( I, K ), eps ); % initial basis matrix in ILRMA2
     end
-end
-if (nargin < 9)
+
     if (type == 1)
         V = max( rand( L, J, N ), eps ); % initial activation matrix in ILRMA1
     elseif (type == 2)
         V = max( rand( K, J ), eps ); % initial activation matrix in ILRMA2
     end
-end
-if (nargin < 10)
-    if (type == 2)
-        Z = max( rand( N, K ), eps ); % initial partitioning function in ILRMA2
-    end
-end
-if (nargin == 10)
-    if (type == 1)
-        error('Partitioning function is not required for ILRMA1.\n');
-    end
-end
+
 if size(W,1) ~= N || size(W,2) ~= M || size(W,3) ~= I
     error('The size of input initial W is incorrect.\n');
 end
@@ -138,22 +117,22 @@ S = zeros(I,J,N);
 H = zeros(N,J);
 
 for i=1:I
-    S(i,:,:) = (W(:,:,i)*squeeze(X(i,:,:)).').'; % initial estimated signals
+    S(i,:,:) = ( squeeze(W(:,:,i)) * squeeze(X(i,:,:)).').'; % initial estimated signals
 end
 P = max(abs(S).^beta,eps); %power
 E = eye(N); %単位行列
 Xp = permute(X,[3,2,1]); % M x J x I
 cost = zeros(It+1,1);
 
+type = 1;
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%% ILRMA1 %%%%%%%%%%%%%%%%%%%%%%%%%%%
 if (type==1) % Algorithm for ILRMA1
     for n=1:N
         R(:,:,n) = T(:,:,n)*V(:,:,n); % source model
     end
-    UN1 = ones(N,1);
-    U1J = ones(1,J);
     if drawConv
-        cost(1,1) = costFunction_local( P, R, W, I, J );
+        cost(1,1) = costFunction_local( P, R, W, I, J, N, beta );
     end
     % Iterative update
     fprintf('Iteration:    ');
@@ -162,12 +141,12 @@ if (type==1) % Algorithm for ILRMA1
         for n=1:N
             %%%%% Update T %%%%%
             T(:,:,n) = T(:,:,n) .* ( beta * squeeze(P(:,:,n).*(R(:,:,n).^(-1-beta/rho)))*squeeze(V(:,:,n)).' ...
-                ./ ( 2*(R(:,:,n).^(-1)).*permute(V(:,:,n), [2,1,3]) ) )^( rho/(beta+rho) );
+                ./ ( 2*(R(:,:,n).^(-1)) * V(:,:,n).' ) ).^( rho/(beta+rho) );
             T(:,:,n) = max(T(:,:,n),eps);
             R(:,:,n) = squeeze(T(:,:,n))*squeeze(V(:,:,n));
             %%%%% Update V %%%%%
-            V(:,:,n) = V(:,:,n) .* ( beta * permute(T(:,:,n), [2,1,3]) .*(P(:,:,n).*(R(:,:,n).^(-1-beta/rho))) ...
-                ./ ( 2*permute(T(:,:,n), [2,1,3]) .*(R(:,:,n).^(-1)) ) )^( rho/(beta+rho) );
+            V(:,:,n) = V(:,:,n) .* ( beta * T(:,:,n).'*(P(:,:,n).*(R(:,:,n).^(-1-beta/rho))) ...
+                ./ ( 2*T(:,:,n).' * (R(:,:,n).^(-1)) ) ).^( rho/(beta+rho) );
             V(:,:,n) = max(V(:,:,n),eps);
             R(:,:,n) = squeeze(T(:,:,n)) * squeeze(V(:,:,n));
             %%%%% Update L %%%%%
@@ -175,32 +154,26 @@ if (type==1) % Algorithm for ILRMA1
             %%%%% Update W %%%%%
             for i=1:I
                 for j=1:J
-                    H(:,j) = X(i,j,:) / L(i,j,n);
+                    H(:,j) = squeeze(X(i,j,:)) / L(i,j,n);
                 end
-                w = W(:,n,i); %w_in 転置
+                w = squeeze(W(n,:,i)); %w_in 転置
                 q = ( w * H )';
                 keisu = sqrt( beta ) / ( 2*sqrt(J*sum( abs(q) .^ beta ) ) );
-                G = keisu * ( norm(q)^2 * H * H' + sum( q ./ R(i,:,n).^2 );
+                F = q(1) / R(i,1,n)^2 * squeeze( X(i,1,:) ) * squeeze(  X(i,1,:) )';
+                for j=2:J
+                    F = F + q(j) / R(i,j,n)^2 * squeeze( X(i,j,:) ) * squeeze(  X(i,j,:) )';
+                end
+                G = keisu * ( norm(q)^2 * (H * H') + F - (H*q)*(H*q)' );
+                w_mm = ( squeeze( W(:,:,i) ) * G ) \ E(:,n);
+                w = w'; %wをたてベクトルに
+                w = 2 * ( w_mm' * G * w ) / ( w_mm' * G * w_mm ) * w_mm - w;
+                w = w * ( 2*J / ( beta * sum( ( (squeeze( X(i,:,:) ) * w  ./ squeeze(R(i,:,n))' ) ) )))^(1/beta);
+                W(n,:,i) = w';
             end
         end
-        P = max(abs(S).^2,eps);
-        %%%%% Normalization %%%%%
-        if normalize
-            %%%%%%%%%%%%%%%%%%%%%%%%%%% !!!NOTE!!! %%%%%%%%%%%%%%%%%%%%%%%%
-            % This normalization increases the computational stability,   %
-            % but the monotonic decrease of the cost function may be lost %
-            % because of the numerical errors in this normalization.      %
-            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-            lambda = sqrt(sum(sum(P,1),2)/(I*J)); % 1 x 1 x N
-            W = W./repmat(squeeze(lambda),[1,M,I]); % N x M x I
-            lambdaIJ = repmat(lambda,[I,J,1]).^2; % I x J x N
-            P = P./lambdaIJ; % I x J x N
-            R = R./lambdaIJ; % I x J x N
-            lambdaIL = repmat(lambda,[I,L,1]).^2; % I x L x N
-            T = T./lambdaIL; % I x L x N
-        end
+        
         if drawConv
-            cost(it+1,1) = costFunction_local( P, R, W, I, J );
+            cost(it+1,1) = costFunction_local( X, R, W, I, J, N, beta );
         end
     end
     fprintf(' ILRMA1 done.\n');
@@ -299,7 +272,7 @@ end
 
 if drawConv
     figure;
-    plot( (0:it), cost );
+    plot( (0:it), abs(cost) );
     set(gca,'FontName','Times','FontSize',16);
     xlabel('Iteration','FontName','Arial','FontSize',16);
     ylabel('Value of cost function','FontName','Arial','FontSize',16);
@@ -307,15 +280,20 @@ end
 end
 
 %% Local function
-function [ cost ] = costFunction_local( P, R, W, I, J )
-A = zeros(I,1);
+function [ cost ] = costFunction_local( X, R, W, I, J, N, beta )
+cost = 0;
 for i=1:I
     x = abs(det(W(:,:,i)));
     if x == 0
         x = eps;
     end
-    A(i) = log(x);
+    for j=1:J
+        for n=1:N
+            cost = cost + squeeze(W(n,:,i))*squeeze(X(i,j,:)) / R(i,j,n)^beta ...
+                + 2 * log( R(i,j,n ) );
+        end
+    end
+    cost = cost + log( x );
 end
-cost = sum(sum(sum(P./R+log(R),3),2),1) - 2*J*sum(A);
 end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% EOF %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
