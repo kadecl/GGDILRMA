@@ -53,11 +53,11 @@ function [sep, cost] = bss_GGDILRMA(mix, ns, nb, fftSize, shiftSize, it, type, r
 [X, window] = STFT( mix, fftSize, shiftSize, 'hamming' );
 
 % Whitening
-Xwhite = whitening( X, ns ); % decorrelate input multichannel signal by applying principal component analysis
+% Xwhite = whitening( X, ns ); % decorrelate input multichannel signal by applying principal component analysis
 
 % ILRMA
-%[Y, cost] = ILRMA( Xwhite, type, it, nb, drawConv, normalize );
-[Y, cost] = GGDILRMA_readable( Xwhite, type, it, nb, drawConv, normalize );
+drawConv = true;
+[Y, cost, ~] = GGDILRMA_readable( X, type, it, nb, drawConv );
 
 % Back projection (fixing scale ambiguity using reference microphone)
 %Z = backProjection( Y, X(:,:,refMic) ); % scale-fixed estimated signal
